@@ -1,0 +1,104 @@
+
+---
+title: "Notes on Gaussian Process Regression"
+author: Thomas Shallcross 
+output: 
+  html_document:
+   fig_height: 5
+
+---
+```{r, echo = FALSE}
+library(mnormt)
+source("GP.R")
+source("colourscale.R")
+```
+
+
+Resources:
+
+1. [Gaussian Processes for Machine Learning](https://gaussianprocess.org/gpml/)
+
+2. [ML Tutorial: Gaussian Processes](https://youtube.com/@marc_deisenroth)
+
+3. [Robust Gaussian Process Modeling](https://betanalpha.github.io/assets/case_studies/gaussian_processes.html)
+
+We can use a Gaussian Process to define a distribution over functions. A Gaussian Process is defined as a "infinite number of random variables, any subset of which have a multivariate normal distribution".
+
+A Gaussian process is completely specified by its mean function, $m(\mathbf{x})$, and co-variance function, $k(\mathbf{x},\mathbf{x'})$, where
+
+\begin{aligned}
+m(\mathbf{x}) &= \mathbb{E}[f(\mathbf{x})],\\
+k(\mathbf{x},\mathbf{x'}) &= \mathbb{E}[(f(\mathbf{x}) - m(\mathbf{x})) (f(\mathbf{x'}) - m(\mathbf{x'}))]
+\end{aligned}
+
+with the Gaussain process written as,
+
+$$
+f(\mathbf{x}) \sim \mathcal{GP}(m(\mathbf{x}), k(\mathbf{x},\mathbf{x'}))
+$$
+
+If we define $m(\mathbf{x})$ and $k(\mathbf{x},\mathbf{x'})$ we have defined a prior over our function space. For simplicity we can take the mean function to be zero. There are many valid covariance functions. One commonly used one is the squared exponential function,
+
+$$
+k(\mathbf{x}, \mathbf{x'}) = \alpha^{2} \text{exp}\left ( -\frac{(\mathbf{x} - \mathbf{x'})^2}{2 \rho^{2}} \right )
+$$
+
+Note that the covariance between the *outputs* is defined by the proximity of their *inputs*. When $\alpha$ is 1, then the covariance approaches 1 as the inputs move closer together, and decreases as the distance over their input space increases.
+
+If we take $x = 0$, we can plot the covariance as $x'$ changes:
+
+```{r, echo = F, fig.width = 5}
+x0 = 0
+x1 = seq(from = -5, to = 5, length.out = 30)
+
+SE <- SE_function(x0, x1)
+plot(x = x1, y = SE, ylab = "k(x, x')", xlab = "x'", cex = 0.5, pch = 19)
+```
+
+We can use the covariance function to define a variance-covariance matrix of a multivariate normal distribution. For example if we take two input values,  x1 = 0 and x2 = 0.2, we can find the variance of the *output* at each input value, $k(x, x)$ and the covariance of the *output* values between the input values, $k(x, x')$.
+
+Using this variance-covariance matrix and the fact that we have defined $m(\mathbf{x}) = 0$ we can plot the bivariate distribution.
+
+```{r, echo = F, fig.width = 10}
+x <- c(0, 0.2)
+Sig <- covC_function(x, x)
+print(Sig)
+
+set.seed(17)
+y <- rmnorm(n = 3, mu, Sig)
+
+par(mfrow = c(1, 2))
+plot_multi_norm(Sig, y)
+plot_output(x, y)
+```
+On the left is the density of the bivariate normal distribution. We can see that $f(x = 0)$ and $f(x' = 0.2)$ strongly covary. The 3 points show 3 samples from the bivariate distribution. We can plot these samples as a function of $x$, as shown on the right.
+
+As $x'$ moves away from $x = 0$ we get a smaller covariance. If we now set $x' = 2$
+
+```{r, echo = F, fig.width = 10}
+x <- c(0, 2)
+Sig <- covC_function(x, x)
+print(Sig)
+
+set.seed(17)
+y <- rmnorm(n = 3, mu, Sig)
+
+par(mfrow = c(1, 2))
+plot_multi_norm(Sig, y)
+plot_output(x, y)
+```
+Essentially what we are saying is that the values of the *outputs* are going to be more correlated to one another the closer together the values of the *inputs* are. If $x$ indexes over time or space then the *output* values close to one another in time or space are going to be similar.
+
+We are not limited to sampling from bivariate normal distributions though. We can define a 20 dimensional normal distribution, with $x$ values ranging between 0 and 2, we can sample from this distribution 3 times and plot the *output* values as a function of the *inputs*.
+
+
+```{r, echo = F, fig.width = 10}
+x <- seq(from = 0, to = 2, length.out = 20)
+Sig <- covC_function(x, x)
+diag(Sig) <- diag(Sig) + 1e-5
+
+set.seed(17)
+y <- rmnorm(n = 3, mu, Sig)
+plot_output(x, y)
+```
+
