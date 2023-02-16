@@ -21,7 +21,7 @@ plot_multi_norm <- function(Sig, y, mu = c(0, 0)){
 plot_output <- function(x, y){
 	x_mat <- matrix(rep(x, nrow(y)), nrow = 3, byrow = T)
 
-	plot(x_mat, y, pch = 19, col = colourscale[1 : 3], xlim = c(-0.3, 2.5), xlab = "x", ylab = "f(x)")
+	plot(x_mat, y, pch = 19, col = colourscale[1 : 3], xlim = c(-0.3, 2.5), ylim = c(-1.5, 2), xlab = "x", ylab = "f(x)")
 
 	n <- ncol(x_mat) - 1
 	for(i in 1:n){

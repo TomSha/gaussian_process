@@ -8,8 +8,8 @@ output:
 
 ---
 ```{r, echo = FALSE}
-library(mnormt)
-source("GP.R")
+library(mvtnorm)
+source("GP_functions.R")
 source("colourscale.R")
 ```
 
@@ -47,6 +47,7 @@ Note that the covariance between the *outputs* is defined by the proximity of th
 
 If we take $x = 0$, we can plot the covariance as $x'$ changes:
 
+<center>
 ```{r, echo = F, fig.width = 5}
 x0 = 0
 x1 = seq(from = -5, to = 5, length.out = 30)
@@ -54,6 +55,7 @@ x1 = seq(from = -5, to = 5, length.out = 30)
 SE <- SE_function(x0, x1)
 plot(x = x1, y = SE, ylab = "k(x, x')", xlab = "x'", cex = 0.5, pch = 19)
 ```
+</center>
 
 We can use the covariance function to define a variance-covariance matrix of a multivariate normal distribution. For example if we take two input values,  x1 = 0 and x2 = 0.2, we can find the variance of the *output* at each input value, $k(x, x)$ and the covariance of the *output* values between the input values, $k(x, x')$.
 
@@ -62,10 +64,11 @@ Using this variance-covariance matrix and the fact that we have defined $m(\math
 ```{r, echo = F, fig.width = 10}
 x <- c(0, 0.2)
 Sig <- covC_function(x, x)
+mu <- c(0, 0)
 print(Sig)
 
 set.seed(17)
-y <- rmnorm(n = 3, mu, Sig)
+y <- rmvnorm(n = 3, mu, Sig)
 
 par(mfrow = c(1, 2))
 plot_multi_norm(Sig, y)
@@ -89,7 +92,7 @@ plot_output(x, y)
 ```
 Essentially what we are saying is that the values of the *outputs* are going to be more correlated to one another the closer together the values of the *inputs* are. If $x$ indexes over time or space then the *output* values close to one another in time or space are going to be similar.
 
-We are not limited to sampling from bivariate normal distributions though. We can define a 20 dimensional normal distribution, with $x$ values ranging between 0 and 2, we can sample from this distribution 3 times and plot the *output* values as a function of the *inputs*.
+We are not limited to sampling from bivariate normal distributions though. For example, we can define a 20 dimensional normal distribution, with $x$ values ranging between 0 and 2, we can sample from this distribution 3 times and plot the *output* values as a function of the *inputs*. As can be seen in the plot below, for each sample, the covariance between points smoothly drops off as the distance between input $x$ values increases. We can now begin to see how sampling from these Gaussian processes can act as a prior over functions.
 
 
 ```{r, echo = F, fig.width = 10}
@@ -100,5 +103,41 @@ diag(Sig) <- diag(Sig) + 1e-5
 set.seed(17)
 y <- rmnorm(n = 3, mu, Sig)
 plot_output(x, y)
+#y <- rmnorm(n = 1000, mu, Sig)
 ```
 
+In general, what we want to use Gaussian process regression for is to predict $f(x)$ at any given $x$ based on some data we have. For example, if we know that $f(x) = 0.5$ at $x = 0$,  we can do two things:
+
+1) force our function to go through $[x = 0, f(x) = 0.5]$
+
+2) predict as best we can $f(x')$ around $x = 0$
+
+We can do this by conditioning our prediction of $f(x')$ on the data that we have. For example, we can try and predict the value of $f(x')$ at $x' = 0.2$. The plot on the left below shows the bivariate density between $f(x)$ and $f(x')$. If we condition on the fact that we known $f(x) = 0.5$ at $x = 0$ then we can see that, due to the correlation between the two *outputs*, we reduce our uncertainty of what value $f(x')$ is likely to take at $x' = 0.2$. We can also see this in the plot on the right, where we have plotted $f(x)$ as a function of $x$.
+
+```{r, echo = F, fig.width = 10}
+x <- c(0, 0.2)
+Sig <- covC_function(x, x)
+mu_cond <- Sig[1,2] * 0.5
+sd_cond <- sqrt((1 - Sig[1,2]^2))
+
+set.seed(18)
+y2 <- rnorm(n = 3, mean = mu_cond, sd = sd_cond)
+y1 <- rep(0.5, 3)
+y <- cbind(y1, y2)
+
+par(mfrow = c(1, 2))
+plot_multi_norm(Sig, y)
+abline(v = 0.5, lty = 2)
+plot_output(x, y)
+```
+
+For a bivariate gaussian distribution,
+$$
+P(X,Y) = \begin{bmatrix} X \\ Y \end{bmatrix} \sim \mathcal{N} \left( \begin{bmatrix} \mu_{X} \\ \mu_{Y} \end{bmatrix},\begin{bmatrix} \sigma_{X}^{2} & \rho \sigma_{X} \sigma_{Y} \\ \rho \sigma_{X} \sigma_{Y} & \sigma_{Y}^{2} \end{bmatrix}  \right)
+$$
+
+The conditional distribution is given by,
+
+$$
+P(Y | X = x) \sim \mathcal{N} \left( \mu_{Y} + \frac{\sigma_{Y}}{\sigma_{X}} \rho (x - \mu_{X}) \right)
+$$
