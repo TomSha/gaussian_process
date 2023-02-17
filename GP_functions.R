@@ -28,3 +28,8 @@ plot_output <- function(x, y){
 		segments(x_mat[,i], y[,i], x_mat[,i + 1], y[,i + 1], col = colourscale[1 : 3])
 	}
 }
+
+plot_prediction <- function(x, f, x_star, mu_pred, Sig_pred){
+	plot(x, f, pch = 19, xlim = c(-0.3, 2.5), ylim = c(-1.5, 2), xlab = "x", ylab = "f(x)")
+	points(x_star, mu_pred, pch = 19, col = "red")
+}

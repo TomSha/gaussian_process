@@ -8,7 +8,7 @@ output:
 
 ---
 ```{r, echo = FALSE}
-library(mvtnorm)
+library(mnormt)
 source("GP_functions.R")
 source("colourscale.R")
 ```
@@ -21,6 +21,8 @@ Resources:
 2. [ML Tutorial: Gaussian Processes](https://youtube.com/@marc_deisenroth)
 
 3. [Robust Gaussian Process Modeling](https://betanalpha.github.io/assets/case_studies/gaussian_processes.html)
+
+# Defining a Gaussian Process
 
 We can use a Gaussian Process to define a distribution over functions. A Gaussian Process is defined as a "infinite number of random variables, any subset of which have a multivariate normal distribution".
 
@@ -57,6 +59,8 @@ plot(x = x1, y = SE, ylab = "k(x, x')", xlab = "x'", cex = 0.5, pch = 19)
 ```
 </center>
 
+# Using a Gaussian process as a prior over functions 
+
 We can use the covariance function to define a variance-covariance matrix of a multivariate normal distribution. For example if we take two input values,  x1 = 0 and x2 = 0.2, we can find the variance of the *output* at each input value, $k(x, x)$ and the covariance of the *output* values between the input values, $k(x, x')$.
 
 Using this variance-covariance matrix and the fact that we have defined $m(\mathbf{x}) = 0$ we can plot the bivariate distribution.
@@ -68,7 +72,7 @@ mu <- c(0, 0)
 print(Sig)
 
 set.seed(17)
-y <- rmvnorm(n = 3, mu, Sig)
+y <- rmnorm(n = 3, mu, Sig)
 
 par(mfrow = c(1, 2))
 plot_multi_norm(Sig, y)
@@ -103,8 +107,9 @@ diag(Sig) <- diag(Sig) + 1e-5
 set.seed(17)
 y <- rmnorm(n = 3, mu, Sig)
 plot_output(x, y)
-#y <- rmnorm(n = 1000, mu, Sig)
 ```
+
+#Using a Gaussian process to make predictions
 
 In general, what we want to use Gaussian process regression for is to predict $f(x)$ at any given $x$ based on some data we have. For example, if we know that $f(x) = 0.5$ at $x = 0$,  we can do two things:
 
@@ -139,5 +144,74 @@ $$
 The conditional distribution is given by,
 
 $$
-P(Y | X = x) \sim \mathcal{N} \left( \mu_{Y} + \frac{\sigma_{Y}}{\sigma_{X}} \rho (x - \mu_{X}) \right)
+P(Y | X = x) \sim \mathcal{N} (\mu_{*}, \sigma^{2}_{*} ) \\
 $$
+
+where
+
+\begin{align}
+\mu_{*} &= \mu_{Y} + \frac{\sigma_{Y}}{\sigma_{X}} \rho (x - \mu_{X}) \\
+\sigma^{2}_{*} &= (1 - \rho^{2})\sigma_{Y}^{2} \\
+\end{align}
+
+In general, if we have a multivariate distribution, this can be partitioned such that:
+
+$$
+\begin{bmatrix} \mathbf{x} \\ \mathbf{y} \end{bmatrix} \sim \mathcal{N} \left( \begin{bmatrix} \mathbf{\mu_{x}} \\ \mathbf{\mu_{y}} \end{bmatrix} , \begin{bmatrix} \Sigma_{xx} & \Sigma_{xy} \\ \Sigma_{yx} & \Sigma_{yy} \end{bmatrix} \right)
+$$
+
+The conditional distribution is given by
+
+$$P(\mathbf{y} | \mathbf{x}) \sim \mathcal{N}(\boldsymbol{\mu_{*}}, \mathbf{\Sigma_{*}})$$ where
+
+\begin{align}
+\boldsymbol{\mu_{*}} &= \boldsymbol{\mu_{y}} + \mathbf{\Sigma_{yx} \Sigma_{xx}^{-1}} (\mathbf{x} - \boldsymbol{\mu_{x}}) \\
+\boldsymbol{\Sigma_{*}} &= \mathbf{\Sigma_{yy}} - \mathbf{\Sigma_{yx} \Sigma_{xx}^{-1} \Sigma_{xy}}
+\end{align}
+
+Therefore, if we have the values of the output $\mathbf{f}$ at some locations $\mathbf{x}$ and we want to predict the value of the output $\mathbf{f_{*}}$ at some locations $\mathbf{x_{*}}$ then we can think of this in terms of a multivariate normal distribution.
+
+\begin{align}\label{eq:joint}
+   \begin{bmatrix}
+   \mathbf{f}\\
+   \mathbf{f_{*}}
+   \end{bmatrix} \sim N
+   \begin{pmatrix}
+   \mathbf{0}, & \begin{bmatrix}
+   k(\mathbf{x}, \mathbf{x}) & k(\mathbf{x}, \mathbf{x_{*}})\\
+   k(\mathbf{x_{*}}, \mathbf{x}) & k(\mathbf{x_{*}}, \mathbf{x_{*}})
+   \end{bmatrix}
+   \end{pmatrix}
+\end{align}
+
+and if we condition on the known values, $\mathbf{f}$, we can work out our best prediction of $\mathbf{f_{*}}$ at $\mathbf{x_{*}}$.
+
+\begin{align}\label{eq:post}
+    \text{P} (\mathbf{f_{*}} \mid \mathbf{x_{*}}, \mathbf{f}, \mathbf{x}) = \text{multi-normal}(\boldsymbol{\mu}, \mathbf{\Sigma})
+\end{align}
+
+where,
+
+\begin{align}
+    \boldsymbol{\mu} &= k(\mathbf{x_{*}}, \mathbf{x}) \cdot k(\mathbf{x}, \mathbf{x})^{-1} \cdot \mathbf{f} \\
+    \boldsymbol{\Sigma} &= k(\mathbf{x_{*}}, \mathbf{x_{*}}) - k(\mathbf{x_{*}}, \mathbf{x}) \cdot k(\mathbf{x}, \mathbf{x}) ^{-1} \cdot k(\mathbf{x}, \mathbf{x_{*}})
+\end{align}
+
+```{r}	
+#simulate data
+x <- c(0, 1)
+Sig <- covC_function(x, x)
+mu <- c(0, 0)
+
+set.seed(17)
+f <- rmnorm(n = 1, mu, Sig)
+
+#predict f at 0.5
+x_star <- 0.5
+Sig_new <- covC_function(x_star, x)
+Sig_star <- covC_function(x_star, x_star)
+
+mu_pred <- Sig_new %*% solve(Sig) %*% f
+Sig_pred <- Sig_star - Sig_new %*% solve(Sig) %*% t(Sig_new)
+```
+
